@@ -254,7 +254,7 @@
 </div>
 
 <script>
-  // 🌟 最新のウェブアプリURLをここに適用済み
+  // 🌟 最新のウェブアプリURLを完全に適用済み
   const API_BASE_URL = "https://script.google.com/macros/s/AKfycbzHyX3Ea6uLOFPlWZj07GUNisqO0N-QkcPhotn4xiNpfszWu3omZvdQhPvHtXRHHw5Bbw/exec";
   const REPLY_CORRECTION_MINUTES = 3;
 
@@ -454,6 +454,7 @@
       .catch(err => { showToast(`取得エラー: ${err.message || err}`); });
   }
 
+  // 以下略 (ロジックは変更なし)
   function sendAll() {
     ensureAudioContext();
     if (!confirm('全員に呼び出しを送信します。よろしいですか？')) return;
