@@ -1,64 +1,461 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  
-  <!-- スマホのホーム画面に追加したときに全画面（スタンドアロン）起動させるための記述 -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="健診課 呼び出し">
-  
-  <!-- GASの「設定」シートにあるアイコンを自動取得してスマホに適用させる設定 -->
-  <link id="app-icon" rel="apple-touch-icon" href="">
-  <link id="shortcut-icon" rel="icon" href="">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="健診課 呼び出し">
 
-  <title>健診課 呼び出し</title>
-  <style>
-    /* 画面の余白をゼロにし、GASの画面を100%の広さで表示します */
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #f4f5f6;
-    }
-    iframe {
-      border: none;
-      width: 100%;
-      height: 100%;
-    }
-  </style>
+<!-- アイコン設定（GASから自動取得してここに適用します） -->
+<link id="app-icon" rel="apple-touch-icon" href="">
+<link id="shortcut-icon" rel="icon" href="">
+
+<title>健診課 呼び出し</title>
+<style>
+html,body{height:100%;margin:0;padding:0;background:#f4f5f6;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+.app{
+display:flex;flex-direction:column;position:relative;
+height:100vh;height:-webkit-fill-available;
+padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) 
+max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.buttons-row{flex:1;display:flex;flex-wrap:wrap;gap:10px;min-height:0;}
+.person-btn,.btn-all{
+flex:1 1 90px;min-width:80px;border-radius:16px;font-family:inherit;font-weight:bold;
+color:#14171a;font-size:clamp(20px,6vw,32px);border:2px solid rgba(0,0,0,.12);
+transition:background-color .25s ease;padding:8px;line-height:1.15;
+display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+}
+.person-btn:disabled,.btn-all:disabled{opacity:.5;}
+.btn-name{display:block;}
+.btn-sub{
+display:block;font-size:clamp(11px,2.6vw,15px);font-weight:600;
+color:rgba(20,23,26,.62);margin-top:4px;min-height:1.1em;
+}
+.btn-sub:empty{display:none;}
+.status-neutral{background:#c7cacd;}
+.status-ok{background:#4caf50;}
+.status-ng{background:#ef4444;}
+.btn-all{background:#29b6f6;}
+.toolbar{
+position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));
+display:flex;gap:4px;z-index:20;
+}
+.icon-btn{
+width:36px;height:36px;border:none;background:transparent;color:#8a9096;font-size:20px;
+line-height:1;display:flex;align-items:center;justify-content:center;
+}
+.icon-btn:active{color:#5f6368;}
+.icon-btn.spinning{animation:spin .6s linear;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.toast{
+position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 60px);transform:translate(-50%,12px);
+background:rgba(20,23,26,.92);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;
+opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;z-index:30;max-width:88vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+.overlay{position:fixed;inset:0;background:rgba(15,17,20,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:40;}
+.overlay.hidden{display:none;}
+.overlay-panel{background:#fff;color:#14171a;border-radius:16px;padding:24px;max-width:360px;width:100%;position:relative;max-height:80vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2);}
+.overlay-close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:none;background:#f1f3f4;color:#444;font-size:16px;}
+.overlay-panel h2{margin:0 0 16px;font-size:17px;}
+.settings-link{display:inline-block;margin-bottom:18px;color:#1a73e8;font-weight:bold;text-decoration:none;}
+.settings-label{font-size:12px;color:#5f6368;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.settings-msg{background:#f5f6f7;border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.6;}
+.settings-msg-subject{font-weight:bold;margin-bottom:6px;}
+.settings-msg-body{white-space:pre-wrap;color:#444;}
+.settings-hint{font-size:12px;color:#5f6368;margin:16px 0 0;line-height:1.6;}
+.reset-all-btn{
+display:block;width:100%;margin-top:16px;padding:12px;border-radius:10px;border:none;
+background:#fce8e6;color:#c5221f;font-weight:bold;font-family:inherit;font-size:14px;
+}
+@media (prefers-reduced-motion:reduce){.person-btn,.btn-all,.toast{transition:none;}.icon-btn.spinning{animation:none;}}
+</style>
 </head>
 <body>
+<div class="app">
+  <!-- ボタン群（GASから名簿を取得して自動生成します） -->
+  <div class="buttons-row" id="buttonsRow">
+    <div style="color: #8a9096; margin: auto; font-size: 16px;">読み込み中…</div>
+  </div>
 
-  <!-- GASのWebアプリ画面を全画面で埋め込みます -->
-  <iframe id="gas-frame" src="https://script.google.com/macros/s/AKfycbzHyX3Ea6uLOFPlWZj07GUNisqO0N-QkcPhotn4xiNpfszWu3omZvdQhPvHtXRHHw5Bbw/exec"></iframe>
+  <div class="toolbar">
+    <button type="button" id="refreshBtn" class="icon-btn" aria-label="更新">⟳</button>
+    <button type="button" id="gearBtn" class="icon-btn" aria-label="設定">⚙</button>
+  </div>
 
-  <script>
-    // ①【重要】ここにステップ1でコピーした「GASのウェブアプリURL」を貼り付けてください
-    var gasUrl = "https://script.google.com/macros/s/AKfycbzHyX3Ea6uLOFPlWZj07GUNisqO0N-QkcPhotn4xiNpfszWu3omZvdQhPvHtXRHHw5Bbw/exec";
+  <div id="toast" class="toast"></div>
 
-    // iframeの読み込み先をセット
-    document.getElementById('gas-frame').src = gasUrl;
+  <div id="settingsOverlay" class="overlay hidden">
+    <div class="overlay-panel">
+      <button type="button" class="overlay-close" aria-label="閉じる">✕</button>
+      <h2>設定</h2>
+      <div id="settingsBody">読み込み中…</div>
+      <p class="settings-hint">個人ボタンは長押しでその人だけの状態をリセットできます。</p>
+      <button type="button" id="resetAllBtn" class="reset-all-btn">全員の状態をリセット</button>
+    </div>
+  </div>
+</div>
 
-    // ② GASのAPI（?action=getIcon）から、設定シートに置かれたアイコン画像をBase64形式で取得し、スマホのアイコンに適用します
-    var iconApiUrl = gasUrl + "?action=getIcon";
-    fetch(iconApiUrl)
-      .then(function(response) {
-        return response.json();
-      })
-      .then(function(data) {
-        if (data && data.iconData) {
-          document.getElementById('app-icon').href = data.iconData;
-          document.getElementById('shortcut-icon').href = data.iconData;
-          console.log("アイコン画像を正常に適用しました。");
-        }
-      })
-      .catch(function(err) {
-        console.log("アイコン画像の自動取得に失敗しました:", err);
-      });
-  </script>
+<script>
+// 【URLを追加済み】あなたのウェブアプリURLに書き換え完了しています
+var API_BASE_URL = "https://script.google.com/macros/s/AKfycbzHyX3Ea6uLOFPlWZj07GUNisqO0N-QkcPhotn4xiNpfszWu3omZvdQhPvHtXRHHw5Bbw/exec";
+var REPLY_CORRECTION_MINUTES = 3;
+
+var LONG_PRESS_MS = 600;
+var personButtons = {};
+var lastKnownStatus = {};
+var toastTimer = null;
+var audioCtx = null;
+
+function apiUrl(params) {
+  var url = new URL(API_BASE_URL);
+  Object.keys(params).forEach(function (key) { url.searchParams.set(key, params[key]); });
+  url.searchParams.set('_', Date.now());
+  return url.toString();
+}
+
+function apiGet(params) {
+  return fetch(apiUrl(params), { method: 'GET', cache: 'no-store' }).then(function (res) {
+    return res.text().then(function (text) {
+      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + text.slice(0, 80));
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error('想定外の応答: ' + text.slice(0, 80));
+      }
+    });
+  });
+}
+
+// 起動時にアイコンと名簿ボタンを取得して画面を組み立てる
+function initApp() {
+  // アイコン取得
+  apiGet({ action: 'getIcon' })
+    .then(function(data) {
+      if (data && data.iconData) {
+        document.getElementById('app-icon').href = data.iconData;
+        document.getElementById('shortcut-icon').href = data.iconData;
+      }
+    }).catch(console.error);
+
+  // ステータスと名簿を初回取得してボタン生成
+  apiGet({ action: 'status' })
+    .then(function(data) {
+      if (!data.ok) { showToast('初期化エラー: ' + data.error); return; }
+      buildButtons(data.people || []);
+      renderStatus(data);
+    }).catch(function(err) {
+      showToast('接続エラー: ' + err);
+    });
+}
+
+function buildButtons(people) {
+  var container = document.getElementById('buttonsRow');
+  container.innerHTML = '';
+  personButtons = {};
+
+  people.forEach(function(p) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'person-btn status-neutral';
+    btn.dataset.name = p.name;
+    
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'btn-name';
+    nameSpan.textContent = p.name;
+    btn.appendChild(nameSpan);
+
+    var subSpan = document.createElement('span');
+    subSpan.className = 'btn-sub';
+    btn.appendChild(subSpan);
+
+    container.appendChild(btn);
+    personButtons[p.name] = btn;
+
+    // 長押し＆クリックイベント設定
+    var pressTimer = null;
+    var longPressed = false;
+    function startPress() {
+      longPressed = false;
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(function () {
+        longPressed = true;
+        resetPerson(p.name);
+      }, LONG_PRESS_MS);
+    }
+    function cancelPress() { clearTimeout(pressTimer); }
+    btn.addEventListener('pointerdown', startPress);
+    btn.addEventListener('pointerup', cancelPress);
+    btn.addEventListener('pointerleave', cancelPress);
+    btn.addEventListener('pointercancel', cancelPress);
+    btn.addEventListener('click', function () {
+      if (longPressed) { longPressed = false; return; }
+      sendPerson(p.name);
+    });
+  });
+
+  // 全員ボタンを追加
+  var btnAll = document.createElement('button');
+  btnAll.type = 'button';
+  btnAll.id = 'btnAll';
+  btnAll.className = 'btn-all';
+  btnAll.textContent = '全員';
+  btnAll.addEventListener('click', sendAll);
+  container.appendChild(btnAll);
+}
+
+function setBusy(busy) {
+  var btnAll = document.getElementById('btnAll');
+  if (btnAll) btnAll.disabled = busy;
+  Object.keys(personButtons).forEach(function (name) { personButtons[name].disabled = busy; });
+}
+
+function showToast(text) {
+  var toast = document.getElementById('toast');
+  toast.textContent = text;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2500);
+}
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  }
+  if (audioCtx.state === 'suspended') { audioCtx.resume().catch(function () {}); }
+}
+
+function playTone(freq, startTime, duration, peakGain) {
+  var osc = audioCtx.createOscillator();
+  var gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(peakGain, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.02);
+}
+
+function playChime(kind) {
+  if (!audioCtx) return;
+  try {
+    var now = audioCtx.currentTime;
+    if (kind === 'ok') {
+      playTone(660, now, 0.11, 0.28);
+      playTone(990, now + 0.1, 0.18, 0.3);
+    } else {
+      playTone(392, now, 0.6, 0.22);
+    }
+  } catch (e) {}
+}
+
+function setSubText(name, text) {
+  var btn = personButtons[name];
+  if (!btn) return;
+  var subEl = btn.querySelector('.btn-sub');
+  if (subEl) subEl.textContent = text;
+}
+
+function sendAll() {
+  ensureAudioContext();
+  if (!confirm('全員に呼び出しを送信します。よろしいですか？')) return;
+  setBusy(true);
+  Object.keys(personButtons).forEach(setCalling);
+  apiGet({ action: 'send' })
+    .then(function (result) {
+      setBusy(false);
+      if (!result.ok) { showToast('送信エラー: ' + result.error); return; }
+      showToast(result.sentCount + ' / ' + result.total + ' 件に送信しました');
+      refreshStatus();
+    })
+    .catch(function (err) {
+      setBusy(false);
+      showToast('送信エラー: ' + err);
+    });
+}
+
+function sendPerson(name) {
+  ensureAudioContext();
+  if (!confirm(name + ' さんを呼び出します。よろしいですか？')) return;
+  setBusy(true);
+  setCalling(name);
+  apiGet({ action: 'send', target: name })
+    .then(function (result) {
+      setBusy(false);
+      if (!result.ok) { showToast('送信エラー: ' + result.error); return; }
+      showToast(result.target + ' さんに送信しました');
+      refreshStatus();
+    })
+    .catch(function (err) {
+      setBusy(false);
+      showToast('送信エラー: ' + err);
+    });
+}
+
+function resetPerson(name) {
+  ensureAudioContext();
+  if (!confirm(name + ' さんの状態をリセットします。よろしいですか？')) return;
+  setBusy(true);
+  setPersonColor(name, 'status-neutral');
+  setSubText(name, '');
+  apiGet({ action: 'reset', target: name })
+    .then(function (result) {
+      setBusy(false);
+      if (!result.ok) { showToast('リセットエラー: ' + result.error); return; }
+      showToast(result.target + ' さんをリセットしました');
+      refreshStatus();
+    })
+    .catch(function (err) {
+      setBusy(false);
+      showToast('リセットエラー: ' + err);
+    });
+}
+
+function resetAll() {
+  ensureAudioContext();
+  if (!confirm('全員の状態をリセットします。よろしいですか？')) return;
+  Object.keys(personButtons).forEach(function (name) {
+    setPersonColor(name, 'status-neutral');
+    setSubText(name, '');
+  });
+  apiGet({ action: 'reset' })
+    .then(function (result) {
+      if (!result.ok) { showToast('リセットエラー: ' + result.error); return; }
+      showToast('全員をリセットしました');
+      closeSettings();
+      refreshStatus();
+    })
+    .catch(function (err) { showToast('リセットエラー: ' + err); });
+}
+
+function statusClass(status) {
+  if (status === '行ける') return 'status-ok';
+  if (status === '行けない') return 'status-ng';
+  return 'status-neutral';
+}
+
+function setPersonColor(name, cls) {
+  var btn = personButtons[name];
+  if (!btn) return;
+  btn.className = 'person-btn ' + cls;
+}
+
+function setCalling(name) {
+  setPersonColor(name, 'status-neutral');
+  setSubText(name, '呼び出し中');
+}
+
+var STATUS_LABEL = {
+  '未送信': '',
+  '未回答': '呼び出し中',
+  '行ける': 'もうすぐきます',
+  '行けない': 'ごめんなさい'
+};
+
+function buildSubText(status, elapsedMinutes) {
+  var label = STATUS_LABEL[status] || '';
+  if (!label) return '';
+  var isAnswered = status === '行ける' || status === '行けない';
+  if (isAnswered && elapsedMinutes < REPLY_CORRECTION_MINUTES) {
+    return label + '(訂正可)';
+  }
+  return elapsedMinutes >= 1 ? label + '(' + elapsedMinutes + '分)' : label;
+}
+
+function renderStatus(data) {
+  if (!data.ok) { showToast('取得エラー: ' + data.error); return; }
+  var people = data.people || [];
+
+  people.forEach(function (p) {
+    var btn = personButtons[p.name];
+    if (!btn) return;
+    setPersonColor(p.name, statusClass(p.status));
+    setSubText(p.name, buildSubText(p.status, p.elapsedMinutes || 0));
+
+    var prev = lastKnownStatus[p.name];
+    if (prev !== undefined && prev !== p.status) {
+      if (p.status === '行ける') playChime('ok');
+      else if (p.status === '行けない') playChime('ng');
+    }
+    lastKnownStatus[p.name] = p.status;
+  });
+}
+
+function refreshStatus() {
+  return apiGet({ action: 'status' })
+    .then(renderStatus)
+    .catch(function (err) { showToast('取得エラー: ' + err); });
+}
+
+document.getElementById('gearBtn').addEventListener('click', openSettings);
+document.querySelector('.overlay-close').addEventListener('click', closeSettings);
+document.getElementById('resetAllBtn').addEventListener('click', resetAll);
+document.getElementById('settingsOverlay').addEventListener('click', function (e) {
+  if (e.target.id === 'settingsOverlay') closeSettings();
+});
+document.getElementById('refreshBtn').addEventListener('click', function () {
+  var btn = this;
+  btn.classList.add('spinning');
+  refreshStatus().finally(function () { btn.classList.remove('spinning'); });
+});
+
+function openSettings() {
+  document.getElementById('settingsOverlay').classList.remove('hidden');
+  document.getElementById('settingsBody').textContent = '読み込み中…';
+  apiGet({ action: 'settings' })
+    .then(renderSettings)
+    .catch(function (err) {
+      document.getElementById('settingsBody').textContent = '取得エラー: ' + err;
+    });
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.add('hidden');
+}
+
+function renderSettings(data) {
+  var el = document.getElementById('settingsBody');
+  el.innerHTML = '';
+  if (!data.ok) { el.textContent = '取得エラー: ' + data.error; return; }
+
+  var link = document.createElement('a');
+  link.href = data.sheetUrl;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.className = 'settings-link';
+  link.textContent = 'スプレッドシートを開く';
+  el.appendChild(link);
+
+  var label = document.createElement('div');
+  label.className = 'settings-label';
+  label.textContent = '現在の送信文面';
+  el.appendChild(label);
+
+  var card = document.createElement('div');
+  card.className = 'settings-msg';
+  var subject = document.createElement('div');
+  subject.className = 'settings-msg-subject';
+  subject.textContent = data.subject;
+  var body = document.createElement('div');
+  body.className = 'settings-msg-body';
+  body.textContent = data.body;
+  card.appendChild(subject);
+  card.appendChild(body);
+  el.appendChild(card);
+}
+
+// 起動
+initApp();
+// 5秒間隔でステータス自動同期
+setInterval(refreshStatus, 5000);
+</script>
 </body>
 </html>
