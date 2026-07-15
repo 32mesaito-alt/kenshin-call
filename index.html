@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <!-- スマホのホーム画面に追加したときに全画面（スタンドアロン）起動させるための記述 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="健診課 呼び出し">
+  
+  <!-- GASの「設定」シートにあるアイコンを自動取得してスマホに適用させる設定 -->
+  <link id="app-icon" rel="apple-touch-icon" href="">
+  <link id="shortcut-icon" rel="icon" href="">
+
+  <title>健診課 呼び出し</title>
+  <style>
+    /* 画面の余白をゼロにし、GASの画面を100%の広さで表示します */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #f4f5f6;
+    }
+    iframe {
+      border: none;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- GASのWebアプリ画面を全画面で埋め込みます -->
+  <iframe id="gas-frame" src="https://script.google.com/macros/s/AKfycbzHyX3Ea6uLOFPlWZj07GUNisqO0N-QkcPhotn4xiNpfszWu3omZvdQhPvHtXRHHw5Bbw/exec"></iframe>
+
+  <script>
+    // ①【重要】ここにステップ1でコピーした「GASのウェブアプリURL」を貼り付けてください
+    var gasUrl = "https://script.google.com/macros/s/AKfycbzHyX3Ea6uLOFPlWZj07GUNisqO0N-QkcPhotn4xiNpfszWu3omZvdQhPvHtXRHHw5Bbw/exec";
+
+    // iframeの読み込み先をセット
+    document.getElementById('gas-frame').src = gasUrl;
+
+    // ② GASのAPI（?action=getIcon）から、設定シートに置かれたアイコン画像をBase64形式で取得し、スマホのアイコンに適用します
+    var iconApiUrl = gasUrl + "?action=getIcon";
+    fetch(iconApiUrl)
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        if (data && data.iconData) {
+          document.getElementById('app-icon').href = data.iconData;
+          document.getElementById('shortcut-icon').href = data.iconData;
+          console.log("アイコン画像を正常に適用しました。");
+        }
+      })
+      .catch(function(err) {
+        console.log("アイコン画像の自動取得に失敗しました:", err);
+      });
+  </script>
+</body>
+</html>
